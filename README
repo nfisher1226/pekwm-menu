@@ -1,0 +1,15 @@
+This is hacked from the excellent openbox-menu program to work with
+pekwm. Original README follows. - NF
+========================================================================
+
+-- PLACE FOR A FUTURE DOCUMENTATION OF OPENBOX-MENU --
+
+
+## Compiling pekwm-menu without icons ##
+
+Edit the Makefile and comment the line (add a # in the begining)
+
+CFLAGS+=-DWITH_ICONS
+
+Remove gtk+-2.0 from the previous lines if errors occur while compiling.
+
