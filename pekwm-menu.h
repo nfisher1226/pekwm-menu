@@ -1,5 +1,5 @@
 /*
- *      openbox-menu.h -  this file is part of openbox-menu
+ *      pekwm-menu.h -  this file is part of pekwm-menu
  *      Copyright (C) 2011,12 mimas <mimasgpc@free.fr>
  *
  *      This program is free software; you can redistribute it and/or modify
