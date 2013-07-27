@@ -12,12 +12,12 @@ BINDIR= ${DESTDIR}/bin
 SRC= $(shell ls *.c 2> /dev/null)
 OBJ= $(SRC:.c=.o)
 
-all: $(OBJ) openbox-menu
+all: $(OBJ) pekwm-menu
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-openbox-menu: $(OBJ)
+pekwm-menu: $(OBJ)
 	$(CC) $(OBJ) -o pekwm-menu $(LDFLAGS) $(LIBS)
 
 .PHONY: clean install doc changelog
