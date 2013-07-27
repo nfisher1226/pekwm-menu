@@ -1,4 +1,6 @@
 //      pekwm-menu - a dynamic menu for pekwm
+//      Copyright - not even bothering
+//      based on openbox-menu - a dynamic menu for openbox
 //      Copyright (C) 2010-12 mimas <mimasgpc@free.fr>
 //
 //      This program is free software; you can redistribute it and/or modify
@@ -167,8 +169,12 @@ clean_exec (MenuCacheApp *app)
  *   If no icon found, it returns the "empty" icon path.
  *
  * NOTES
- *   Imlib2, used by Pekwm to display icons, doesn't load SVG graphics.
+ *   Imlib2, used by Openbox to display icons, doesn't load SVG graphics.
  *   We have to use GTK_ICON_LOOKUP_NO_SVG flag to look up icons.
+ *
+ * Notes
+ *   Pekwm uses libpng, libjpeg, and libXpm directly rather than Imlib2.
+ *   The net effect is the same, just a clarification.
  *
  * TODO
  *   The "2nd fallback" is annoying, I have to think about this.
