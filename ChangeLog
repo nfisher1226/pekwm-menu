@@ -1,3 +1,6 @@
+2013-07-27 Nathan Fisher <nfisher.sr@gmail.com>
+	Removed get_safe_name function
+
 2013-07-26 Nathan Fisher <nfisher.sr@gmail.com>
 	Hacked for pekwm
 

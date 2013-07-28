@@ -48,44 +48,6 @@ void sig_term_handler (int sig)
 	g_main_loop_quit (loop);
 }
 
-/****f* pekwm-menu/get_safe_name
- * FUNCTION
- *   Convert &, <, > and " signs to html entities
- *
- * OUTPUT
- *   A gchar that needs to be freed.
- ****/
-gchar *
-get_safe_name (const char *name)
-{
-	g_return_val_if_fail (name != NULL, NULL);
-
-	GString *cmd = g_string_sized_new (256);
-
-	for (;*name; ++name)
-	{
-		switch(*name)
-		{
-			case '&':
-				g_string_append (cmd, "&amp;");
-				break;
-			case '<':
-				g_string_append (cmd, "&lt;");
-				break;
-			case '>':
-				g_string_append (cmd, "&gt;");
-				break;
-			case '"':
-				g_string_append (cmd, "&quote;");
-				break;
-			default:
-				g_string_append_c (cmd, *name);
-		}
-	}
-	return g_string_free (cmd, FALSE);
-}
-
-
 /****f* pekwm-menu/clean_exec
  * FUNCTION
  *   Remove %f, %F, %u, %U, %i, %c, %k from exec field.
@@ -235,8 +197,8 @@ app_is_visible(MenuCacheApp *app, guint32 de_flag)
 void
 menu_directory (MenuCacheApp *dir)
 {
-	gchar *dir_id = get_safe_name (menu_cache_item_get_id (MENU_CACHE_ITEM(dir)));
-	gchar *dir_name = get_safe_name (menu_cache_item_get_name (MENU_CACHE_ITEM(dir)));
+	gchar *dir_id = menu_cache_item_get_id (MENU_CACHE_ITEM(dir));
+	gchar *dir_name = menu_cache_item_get_name (MENU_CACHE_ITEM(dir));
 
 #ifdef WITH_ICONS
 	if (!no_icons)
@@ -271,9 +233,9 @@ menu_application (MenuCacheApp *app)
 	gchar *exec_cmd = NULL;
 
 	if (comment_name && menu_cache_item_get_comment (MENU_CACHE_ITEM(app)))
-		exec_name = get_safe_name (menu_cache_item_get_comment (MENU_CACHE_ITEM(app)));
+		exec_name = menu_cache_item_get_comment (MENU_CACHE_ITEM(app));
 	else
-		exec_name = get_safe_name (menu_cache_item_get_name (MENU_CACHE_ITEM(app)));
+		exec_name = menu_cache_item_get_name (MENU_CACHE_ITEM(app));
 
 	exec_cmd = clean_exec (app);
 
