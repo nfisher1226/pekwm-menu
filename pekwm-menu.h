@@ -17,7 +17,19 @@
  *      MA 02110-1301, USA.
  */
 
-#define VERSION "0.3.6.7"
+#define VERSION "0.5.0"
+
+#define APPMENU_SIZE 30
 
 guint app_is_visible(MenuCacheApp *, guint32);
 gchar *get_item_icon_path (MenuCacheItem*);
+
+typedef struct {
+	/* Configuration */
+	gchar    *output;
+	guint32   show_flag;
+	GString  *builder;      /* */
+	gchar    *terminal_cmd; /* command to launch program in a terminal */
+	gboolean  comment;      /* display description instead of name */
+	gboolean  no_icons;     /* icons disabled */
+} OB_Menu;

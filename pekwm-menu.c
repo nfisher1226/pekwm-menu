@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <glib.h>
+#include <glib/gprintf.h>
 #ifdef WITH_ICONS
 	#include <gtk/gtk.h>
 #endif
@@ -26,27 +27,22 @@
 #include <menu-cache.h>
 #include <signal.h>
 #include <locale.h>
+#include <stdlib.h>
 
 #include "pekwm-menu.h"
 
-GString *menu_data = NULL;
-gchar *menu_output = NULL;
 GMainLoop *loop = NULL;
-
-gchar *terminal_cmd = "xterm -e";
-guint32 show_flag = 0;
-gboolean comment_name = FALSE;
-gboolean sn_enabled = FALSE;
-gboolean no_icons = FALSE;
 #ifdef WITH_ICONS
-	GtkIconTheme *icon_theme = NULL;
+	GtkIconTheme *icon_theme;
 #endif
+
 /* from lxsession */
 void sig_term_handler (int sig)
 {
 	g_warning ("Aborting");
 	g_main_loop_quit (loop);
 }
+
 
 /****f* pekwm-menu/clean_exec
  * FUNCTION
@@ -130,8 +126,10 @@ clean_exec (MenuCacheApp *app)
  *   return the path for the themed icon if item.
  *   If no icon found, it returns the "empty" icon path.
  *
+ *   The returned string should be freed when no longer needed
+ *
  * NOTES
- *   Imlib2, used by Openbox to display icons, doesn't load SVG graphics.
+ *   Imlib2, used by OpenBox to display icons, doesn't load SVG graphics.
  *   We have to use GTK_ICON_LOOKUP_NO_SVG flag to look up icons.
  *
  * Notes
@@ -148,6 +146,7 @@ get_item_icon_path (MenuCacheItem *item)
 	gchar *icon = NULL;
 	gchar *tmp_name = NULL;
 
+	/* type changed from gchar to const char due to removal of get_safe_name function - NF 2013-08-21 */
 	const gchar *name = menu_cache_item_get_icon (MENU_CACHE_ITEM(item));
 
 	if (name)
@@ -159,8 +158,11 @@ get_item_icon_path (MenuCacheItem *item)
 		 *  lookup a theme icon for, ie, 'geany.png'. It has to be 'geany'.
 		 */
 		tmp_name = strndup (name, strrchr (name, '.') - name);
-
+	#ifdef WITH_SVG
+		icon_info = gtk_icon_theme_lookup_icon (icon_theme, tmp_name, 16, GTK_ICON_LOOKUP_GENERIC_FALLBACK);
+	#else
 		icon_info = gtk_icon_theme_lookup_icon (icon_theme, tmp_name, 16, GTK_ICON_LOOKUP_NO_SVG | GTK_ICON_LOOKUP_GENERIC_FALLBACK);
+	#endif
 		g_free (tmp_name);
 	}
 
@@ -172,7 +174,7 @@ get_item_icon_path (MenuCacheItem *item)
 
 	return icon;
 }
-#endif
+#endif /* WITH_ICONS */
 
 
 guint
@@ -192,32 +194,31 @@ app_is_visible(MenuCacheApp *app, guint32 de_flag)
  *   create a menu entry for a directory.
  *
  * NOTES
- *   this menu entry has to be closed by "}".
+ *   this menu entry has to be closed by "</menu>".
  ****/
 void
-menu_directory (MenuCacheApp *dir)
+menu_directory (MenuCacheApp *dir, OB_Menu *context)
 {
-	gchar *dir_id = menu_cache_item_get_id (MENU_CACHE_ITEM(dir));
-	gchar *dir_name = menu_cache_item_get_name (MENU_CACHE_ITEM(dir));
+	/* type changed from gchar to const char due to removal of get_safe_name function - NF 2013-08-21 */
+	const char *dir_name = menu_cache_item_get_name (MENU_CACHE_ITEM(dir));
 
 #ifdef WITH_ICONS
-	if (!no_icons)
+	if (!context->no_icons)
 	{
 		gchar *dir_icon = get_item_icon_path (MENU_CACHE_ITEM(dir));
 
-		g_string_append_printf (menu_data,
+		g_string_append_printf (context->builder,
 		    "Submenu = \"%s\" { Icon = \"%s\"\n",
 		    dir_name, dir_icon);
 		g_free (dir_icon);
 	}
 	else
 #endif
-	g_string_append_printf (menu_data,
-	    "Submenu = \"%s\" {\n",
-	    dir_id, dir_name);
-
-	g_free (dir_id);
-	g_free (dir_name);
+	{
+		g_string_append_printf (context->builder,
+	      "Submenu = \"%s\" {\n",
+	      dir_name);
+	}
 }
 
 
@@ -226,13 +227,14 @@ menu_directory (MenuCacheApp *dir)
  *   create a menu entry for an application.
  ****/
 void
-menu_application (MenuCacheApp *app)
+menu_application (MenuCacheApp *app, OB_Menu *context)
 {
-	gchar *exec_name = NULL;
+	const char *exec_name = NULL;
 	gchar *exec_icon = NULL;
 	gchar *exec_cmd = NULL;
 
-	if (comment_name && menu_cache_item_get_comment (MENU_CACHE_ITEM(app)))
+	/* is comment (description) or name displayed ? */
+	if (context->comment && menu_cache_item_get_comment (MENU_CACHE_ITEM(app)))
 		exec_name = menu_cache_item_get_comment (MENU_CACHE_ITEM(app));
 	else
 		exec_name = menu_cache_item_get_name (MENU_CACHE_ITEM(app));
@@ -240,39 +242,32 @@ menu_application (MenuCacheApp *app)
 	exec_cmd = clean_exec (app);
 
 #ifdef WITH_ICONS
-	if (!no_icons)
+	if (!context->no_icons)
 	{
 		exec_icon = get_item_icon_path (MENU_CACHE_ITEM(app));
-
-	if (menu_cache_app_get_use_terminal (app))
-		g_string_append_printf (menu_data,
-		  "Entry = \"%s\" { Icon=\"%s\"; Actions = \"Exec %s %s\" }\n",
+		g_string_append_printf (context->builder,
+	      "Entry = \"%s\" { Icon = \"%s\"; Actions = \"Exec ",
 	      exec_name,
-	      exec_icon,
-	      terminal_cmd,
-	      exec_cmd);
-	else
-		g_string_append_printf (menu_data,
-	      "Entry = \"%s\" { Icon=\"%s\"; Actions = \"Exec %s\" }\n",
-	      exec_name,
-	      exec_icon,
-	      exec_cmd);
+	      exec_icon);
 	}
 	else
 #endif
-	if (menu_cache_app_get_use_terminal (app))
-		g_string_append_printf (menu_data,
-		  "Entry = \"%s\" { Actions = \"Exec %s %s\" }\n",
-	      exec_name,
-	      terminal_cmd,
-	      exec_cmd);
-	else
-	g_string_append_printf (menu_data,
-	    "Entry = \"%s\" { Actions = \"Exec %s\" }\n",
-	    exec_name,
-	    exec_cmd);
+	{
+		g_string_append_printf (context->builder,
+	      "Entry = \"%s\" { Actions = \"Exec ",
+	      exec_name);
+	}
 
-	g_free (exec_name);
+	if (menu_cache_app_get_use_terminal (app))
+		g_string_append_printf (context->builder,
+	        "%s %s &\" }\n",
+	        context->terminal_cmd,
+	        exec_cmd);
+	else
+		g_string_append_printf (context->builder,
+	        "%s &\" }\n",
+	        exec_cmd);
+
 	g_free (exec_icon);
 	g_free (exec_cmd);
 }
@@ -286,7 +281,7 @@ menu_application (MenuCacheApp *app)
  *   It calls itself when 'dir' type is MENU_CACHE_TYPE_DIR.
  ****/
 void
-generate_pekwm_menu (MenuCacheDir *dir)
+generate_pekwm_menu (MenuCacheDir *dir, OB_Menu *context)
 {
 	GSList *l = NULL;
 
@@ -294,18 +289,18 @@ generate_pekwm_menu (MenuCacheDir *dir)
 		switch ((guint) menu_cache_item_get_type (MENU_CACHE_ITEM(l->data)))
 		{
 			case MENU_CACHE_TYPE_DIR:
-				menu_directory (l->data);
-				generate_pekwm_menu (MENU_CACHE_DIR(l->data));
-				g_string_append (menu_data, "}\n");
+				menu_directory (l->data, context);
+				generate_pekwm_menu (MENU_CACHE_DIR(l->data), context);
+				g_string_append (context->builder, "}\n");
 				break;
 
 			case MENU_CACHE_TYPE_SEP:
-				g_string_append (menu_data, "Separator {}\n");
+				g_string_append (context->builder, "Separator {}\n");
 				break;
 
 			case MENU_CACHE_TYPE_APP:
 				if (app_is_visible (MENU_CACHE_APP(l->data), 0))
-					menu_application (l->data);
+					menu_application (l->data, context);
 		}
 }
 
@@ -329,7 +324,7 @@ generate_pekwm_menu (MenuCacheDir *dir)
  *   I don't have a lot of applications installed.
  ****/
 void
-display_menu (MenuCache *menu, gchar *file)
+display_menu (MenuCache *menu, OB_Menu *context)
 {
 	MenuCacheDir *dir = menu_cache_get_root_dir (menu);
 	if (G_UNLIKELY(dir == NULL))
@@ -341,76 +336,133 @@ display_menu (MenuCache *menu, gchar *file)
 	GSList *l = menu_cache_dir_get_children (dir);
 
 	if (g_slist_length (l) != 0) {
-		menu_data = g_string_sized_new (16 * 1024);
-		g_string_append (menu_data,
+		context->builder = g_string_sized_new (16 * 1024);
+		g_string_append (context->builder,
 		    "Dynamic {\n");
-		generate_pekwm_menu(dir);
-		g_string_append (menu_data, "}\n");
+		generate_pekwm_menu(dir, context);
+		g_string_append (context->builder, "}\n");
 
-		gchar *buff = g_string_free (menu_data, FALSE);
-		if (file)
+		gchar *buff = g_string_free (context->builder, FALSE);
+
+		/* Has menu content to be saved in a file ? */
+		if (context->output)
 		{
-			if (!g_file_set_contents (file, buff, -1, NULL))
-				g_warning ("Can't write to %s\n", file);
+			if (!g_file_set_contents (context->output, buff, -1, NULL))
+				g_warning ("Can't write to %s\n", context->output);
 			else
-				g_message ("wrote to %s", file);
+				g_message ("wrote to %s", context->output);
 		}
-		else
+		else /* No, so it's displayed on screen */
 			g_print ("%s", buff);
 
 		g_free (buff);
 	}
 	else
 		g_warning ("Cannot create menu, check if the .menu file is correct");
+}
 
+
+gchar *
+get_application_menu (void)
+{
+	gchar menu[APPMENU_SIZE];
+
+	gchar *xdg_prefix = getenv("XDG_MENU_PREFIX");
+	if (xdg_prefix)
+	{
+		g_snprintf (menu, APPMENU_SIZE, "%sapplications.menu", xdg_prefix);
+	}
+	else
+		g_strlcpy (menu, "applications.menu", APPMENU_SIZE);
+
+	return strdup (menu);
+}
+
+
+gboolean
+check_application_menu (gchar *menu)
+{
+	gchar *menu_path = g_build_filename ("/etc","xdg", "menus", menu, NULL);
+	if (!g_file_test (menu_path, G_FILE_TEST_EXISTS))
+	{
+		g_print ("File %s doesn't exists. Can't create menu\n", menu_path);
+		g_free (menu_path);
+		return FALSE;
+	}
+	else
+	{
+		g_free (menu_path);
+		return TRUE;
+	}
 }
 
 
 int
 main (int argc, char **argv)
 {
-	gchar **app_menu = NULL;
+
 	gpointer reload_notify_id = NULL;
-	GOptionContext *context = NULL;
-	gboolean show_gnome = FALSE;
-	gboolean show_kde = FALSE;
-	gboolean show_xfce = FALSE;
-	gboolean show_rox = FALSE;
-	gboolean persistent = FALSE;
-	gchar *output = NULL;
 	GError *error = NULL;
+	gchar  *menu = NULL;
+	OB_Menu ob_context = { 0 };
+
+	gboolean  show_gnome = FALSE;
+	gboolean  show_kde = FALSE;
+	gboolean  show_xfce = FALSE;
+	gboolean  show_rox = FALSE;
+	gboolean  persistent = FALSE;
+	gchar   **app_menu = NULL;
+	gchar    *output = NULL;
+	gchar    *terminal = "xterm -e";
+	/*
+	 * TODO: Registered OnlyShowIn Environments
+	 *  Ref: http://standards.freedesktop.org/menu-spec/latest/apb.html
+	 *
+	 * GNOME GNOME Desktop
+	 * KDE   KDE Desktop
+	 * LXDE  LXDE Desktop
+	 * MATE  MATÉ Desktop
+	 * Razor Razor-qt Desktop
+	 * ROX   ROX Desktop
+	 * TDE   Trinity Desktop
+	 * Unity Unity Shell
+	 * XFCE  XFCE Desktop
+	 * Old   Legacy menu systems
+	 */
+	 /* removed startup-notify option and associated code as pekwm doesn't support it
+	 * 2013-08-21 NF
+	 */
 	GOptionEntry entries[] = {
-		{ "comment",   'c', 0, G_OPTION_ARG_NONE,
-		  &comment_name, "Show generic name instead of application name", NULL },
-		{ "terminal",  't', 0, G_OPTION_ARG_STRING,
-		  &terminal_cmd, "Terminal command (default xterm -e)", "cmd" },
-		{ "gnome",     'g', 0, G_OPTION_ARG_NONE,
-		  &show_gnome, "Show GNOME entries", NULL },
-		{ "kde",       'k', 0, G_OPTION_ARG_NONE,
-		  &show_kde,   "Show KDE entries", NULL },
-		{ "xfce",      'x', 0, G_OPTION_ARG_NONE,
-		  &show_xfce,   "Show XFCE entries", NULL },
-		{ "rox",       'r', 0, G_OPTION_ARG_NONE,
-		  &show_rox,   "Show ROX entries", NULL },
-		{ "persistent",'p', 0, G_OPTION_ARG_NONE,
-		  &persistent, "stay active", NULL },
-		{ "sn",        's', 0, G_OPTION_ARG_NONE,
-		  &sn_enabled, "Enable startup notification", NULL },
-		{ "output",    'o', 0, G_OPTION_ARG_STRING,
-		  &output, "file to write data to", NULL },
-		{ "noicons",    'i', 0, G_OPTION_ARG_NONE,
-		  &no_icons, "Don't display icons in menu", NULL },
-		{ G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_STRING_ARRAY,
-		  &app_menu, NULL, "[file.menu]" },
+		{ "comment",   'c', 0, G_OPTION_ARG_NONE, &ob_context.comment,
+		  "Show generic name instead of application name", NULL },
+		{ "terminal",  't', 0, G_OPTION_ARG_STRING, &terminal,
+		  "Terminal command (default xterm -e)", "cmd" },
+		{ "gnome",     'g', 0, G_OPTION_ARG_NONE, &show_gnome,
+		  "Show GNOME entries", NULL },
+		{ "kde",       'k', 0, G_OPTION_ARG_NONE, &show_kde,
+		  "Show KDE entries", NULL },
+		{ "xfce",      'x', 0, G_OPTION_ARG_NONE, &show_xfce,
+		  "Show XFCE entries", NULL },
+		{ "rox",       'r', 0, G_OPTION_ARG_NONE, &show_rox,
+		  "Show ROX entries", NULL },
+		{ "persistent",'p', 0, G_OPTION_ARG_NONE, &persistent,
+		  "stay active",    NULL },
+		{ "output",    'o', 0, G_OPTION_ARG_STRING, &output,
+		  "file to write data to", NULL },
+		{ "noicons", 'i',   0, G_OPTION_ARG_NONE, &ob_context.no_icons,
+		  "Don't display icons in menu", NULL },
+		{ G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_STRING_ARRAY, &app_menu,
+		  NULL, "[file.menu]" },
 		{NULL}
 	};
+	GOptionContext *help_context = NULL;
 
 	setlocale (LC_ALL, "");
 
-	context = g_option_context_new (" - Pekwm menu generator " VERSION);
-	g_option_context_set_help_enabled (context, TRUE);
-	g_option_context_add_main_entries (context, entries, NULL);
-	g_option_context_parse (context, &argc, &argv, &error);
+	help_context = g_option_context_new (" - Openbox menu generator " VERSION);
+	g_option_context_set_help_enabled (help_context, TRUE);
+	g_option_context_add_main_entries (help_context, entries, NULL);
+	g_option_context_parse (help_context, &argc, &argv, &error);
 
 	if (error)
 	{
@@ -419,38 +471,53 @@ main (int argc, char **argv)
 		return 1;
 	}
 
-	g_option_context_free (context);
+	g_option_context_free (help_context);
 
 #ifdef WITH_ICONS
 	gtk_init (&argc, &argv);
-	gdk_init(&argc, &argv);
 	icon_theme = gtk_icon_theme_get_default ();
 #endif
 
 	if (output)
-		menu_output = g_build_filename (g_get_user_cache_dir (), output, NULL);
+		ob_context.output = g_build_filename (g_get_user_cache_dir (), output, NULL);
+	else
+		ob_context.output =  NULL;
 
-	if (show_gnome) show_flag |= SHOW_IN_GNOME;
-	if (show_kde)   show_flag |= SHOW_IN_KDE;
-	if (show_xfce)  show_flag |= SHOW_IN_XFCE;
-	if (show_rox)   show_flag |= SHOW_IN_ROX;
+	if (terminal)
+		ob_context.terminal_cmd = terminal;
+
+	if (show_gnome) ob_context.show_flag |= SHOW_IN_GNOME;
+	if (show_kde)   ob_context.show_flag |= SHOW_IN_KDE;
+	if (show_xfce)  ob_context.show_flag |= SHOW_IN_XFCE;
+	if (show_rox)   ob_context.show_flag |= SHOW_IN_ROX;
+
+	if (!app_menu)
+		menu = get_application_menu ();
+	else
+		menu = strdup (*app_menu);
+
+	if (!check_application_menu (menu))
+		return 1;
 
 	// wait for the menu to get ready
-	MenuCache *menu_cache = menu_cache_lookup_sync (app_menu?*app_menu:"applications.menu");
+	MenuCache *menu_cache = menu_cache_lookup_sync (menu);
 	if (!menu_cache )
 	{
+		g_free (menu);
 		g_warning ("Cannot connect to menu-cache :/");
 		return 1;
 	}
 
 	// display the menu anyway
-	display_menu(menu_cache, menu_output);
+	display_menu(menu_cache, &ob_context);
 
 	if (persistent)
 	{
 		// menucache used to reload the cache after a call to menu_cache_lookup* ()
-		// It's not true any more with version >= 0.4.0.
-		reload_notify_id = menu_cache_add_reload_notify (menu_cache, (GFunc) display_menu, menu_output);
+		// It's not true anymore with version >= 0.4.0.
+		reload_notify_id = menu_cache_add_reload_notify (menu_cache,
+		                        (MenuCacheReloadNotify) display_menu,
+		                        &ob_context);
 
 		// install signals handler
 		signal (SIGTERM, sig_term_handler);
@@ -465,7 +532,8 @@ main (int argc, char **argv)
 	}
 
 	menu_cache_unref (menu_cache);
-	g_free (menu_output);
+	g_free (menu);
+	g_free (ob_context.output);
 
 	return 0;
 }

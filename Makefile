@@ -1,5 +1,6 @@
 LIBS= `pkg-config --libs glib-2.0 gtk+-2.0 libmenu-cache`
-CFLAGS+= -g -Wall -g `pkg-config --cflags glib-2.0 gtk+-2.0 libmenu-cache`
+CFLAGS+= -g -Wall `pkg-config --cflags glib-2.0 gtk+-2.0 libmenu-cache`
+CC=gcc
 #-DG_DISABLE_DEPRECATED
 
 # Comment this line if you don't want icons to appear in menu
@@ -20,17 +21,23 @@ all: $(OBJ) pekwm-menu
 pekwm-menu: $(OBJ)
 	$(CC) $(OBJ) -o pekwm-menu $(LDFLAGS) $(LIBS)
 
-.PHONY: clean install doc changelog
+.PHONY: clean install doc changelog check
 
 clean:
 	@rm -f *.o pekwm-menu
 	@rm -rf doc
 
 install:
+	@strip -s pekwm-menu
 	@install -Dm 755 pekwm-menu $(BINDIR)/pekwm-menu
 
 doc:
 	robodoc --src . --doc doc/ --multidoc --index --html --cmode
+
+check: pekwm-menu
+	./pekwm-menu > test.xml 
+	xmllint test.xml
+	rm test.xml
 
 changelog:
 	@hg log --style changelog > ChangeLog
