@@ -459,7 +459,7 @@ main (int argc, char **argv)
 
 	setlocale (LC_ALL, "");
 
-	help_context = g_option_context_new (" - Openbox menu generator " VERSION);
+	help_context = g_option_context_new (" - Pekwm menu generator " VERSION);
 	g_option_context_set_help_enabled (help_context, TRUE);
 	g_option_context_add_main_entries (help_context, entries, NULL);
 	g_option_context_parse (help_context, &argc, &argv, &error);
