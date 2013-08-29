@@ -158,11 +158,9 @@ get_item_icon_path (MenuCacheItem *item)
 		 *  lookup a theme icon for, ie, 'geany.png'. It has to be 'geany'.
 		 */
 		tmp_name = strndup (name, strrchr (name, '.') - name);
-	#ifdef WITH_SVG
-		icon_info = gtk_icon_theme_lookup_icon (icon_theme, tmp_name, 16, GTK_ICON_LOOKUP_GENERIC_FALLBACK);
-	#else
+	/* Pekwm has no svg support so disabled svg ifdef code completely
+	 * NF 2013-08-29*/
 		icon_info = gtk_icon_theme_lookup_icon (icon_theme, tmp_name, 16, GTK_ICON_LOOKUP_NO_SVG | GTK_ICON_LOOKUP_GENERIC_FALLBACK);
-	#endif
 		g_free (tmp_name);
 	}
 

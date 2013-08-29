@@ -31,13 +31,5 @@ install:
 	@strip -s pekwm-menu
 	@install -Dm 755 pekwm-menu $(BINDIR)/pekwm-menu
 
-doc:
-	robodoc --src . --doc doc/ --multidoc --index --html --cmode
-
-check: pekwm-menu
-	./pekwm-menu > test.xml 
-	xmllint test.xml
-	rm test.xml
-
 changelog:
 	@hg log --style changelog > ChangeLog
