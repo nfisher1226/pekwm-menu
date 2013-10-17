@@ -313,6 +313,9 @@ generate_pekwm_menu (MenuCacheDir *dir, OB_Menu *context)
  *   * file, the filename where the menu content should be written to.
  *     If file is 'NULL' then the menu content is displayed.
  *
+ * RETURNS
+ *    1 if error, 0 otherwise
+ *
  * NOTES
  *   A 16 KiB GString is allocated for the content of the pipemenu.
  *   This should be enough prevent too many allocations while building
@@ -321,14 +324,14 @@ generate_pekwm_menu (MenuCacheDir *dir, OB_Menu *context)
  *   The size of the XML file created is around 8 KB in my computer but
  *   I don't have a lot of applications installed.
  ****/
-void
+gint
 display_menu (MenuCache *menu, OB_Menu *context)
 {
 	MenuCacheDir *dir = menu_cache_get_root_dir (menu);
 	if (G_UNLIKELY(dir == NULL))
 	{
 		g_warning ("Can't get menu root dir");
-		return;
+		return 1;
 	}
 
 	GSList *l = menu_cache_dir_get_children (dir);
@@ -354,43 +357,12 @@ display_menu (MenuCache *menu, OB_Menu *context)
 			g_print ("%s", buff);
 
 		g_free (buff);
+		return 0;
 	}
 	else
+	{
 		g_warning ("Cannot create menu, check if the .menu file is correct");
-}
-
-
-gchar *
-get_application_menu (void)
-{
-	gchar menu[APPMENU_SIZE];
-
-	gchar *xdg_prefix = getenv("XDG_MENU_PREFIX");
-	if (xdg_prefix)
-	{
-		g_snprintf (menu, APPMENU_SIZE, "%sapplications.menu", xdg_prefix);
-	}
-	else
-		g_strlcpy (menu, "applications.menu", APPMENU_SIZE);
-
-	return strdup (menu);
-}
-
-
-gboolean
-check_application_menu (gchar *menu)
-{
-	gchar *menu_path = g_build_filename ("/etc","xdg", "menus", menu, NULL);
-	if (!g_file_test (menu_path, G_FILE_TEST_EXISTS))
-	{
-		g_print ("File %s doesn't exists. Can't create menu\n", menu_path);
-		g_free (menu_path);
-		return FALSE;
-	}
-	else
-	{
-		g_free (menu_path);
-		return TRUE;
+		return 1;
 	}
 }
 
@@ -412,6 +384,7 @@ main (int argc, char **argv)
 	gchar   **app_menu = NULL;
 	gchar    *output = NULL;
 	gchar    *terminal = "xterm -e";
+	gint      ret;
 	/*
 	 * TODO: Registered OnlyShowIn Environments
 	 *  Ref: http://standards.freedesktop.org/menu-spec/latest/apb.html
@@ -489,16 +462,9 @@ main (int argc, char **argv)
 	if (show_xfce)  ob_context.show_flag |= SHOW_IN_XFCE;
 	if (show_rox)   ob_context.show_flag |= SHOW_IN_ROX;
 
-	if (!app_menu)
-		menu = get_application_menu ();
-	else
-		menu = strdup (*app_menu);
-
-	if (!check_application_menu (menu))
-		return 1;
 
 	// wait for the menu to get ready
-	MenuCache *menu_cache = menu_cache_lookup_sync (menu);
+	MenuCache *menu_cache = menu_cache_lookup_sync (app_menu?*app_menu:"applications.menu");
 	if (!menu_cache )
 	{
 		g_free (menu);
@@ -507,7 +473,7 @@ main (int argc, char **argv)
 	}
 
 	// display the menu anyway
-	display_menu(menu_cache, &ob_context);
+	ret = display_menu(menu_cache, &ob_context);
 
 	if (persistent)
 	{
@@ -531,7 +497,8 @@ main (int argc, char **argv)
 
 	menu_cache_unref (menu_cache);
 	g_free (menu);
-	g_free (ob_context.output);
+	if (ob_context.output)
+		g_free (ob_context.output);
 
-	return 0;
+	return ret;
 }
