@@ -1,6 +1,10 @@
 This is hacked from the excellent openbox-menu program to work with
 pekwm. Original README follows, all applies to pekwm-menu by replacing
 "openbox" with "pekwm". - NF
+
+Broken due to changes in menu-cache. Left for historical purposes or in
+case someone wants to bring it back to life. For a possible replacement
+see my wmpipe project.
 ========================================================================
 
 Openbox-menu is a pipemenu for Openbox window manager. It provides a dynamic
